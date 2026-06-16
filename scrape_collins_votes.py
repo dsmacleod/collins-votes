@@ -85,20 +85,35 @@ def is_procedural(text):
     return any(k in t for k in PROCEDURAL_KEYS)
 
 
-def fetch(url, cache_name):
-    """Download with on-disk caching so re-runs are instant and polite."""
+def fetch(url, cache_name, retries=5):
+    """Download with on-disk caching so re-runs are instant and polite.
+
+    Retries transient network errors with exponential backoff so a single
+    dropped connection doesn't kill a multi-thousand-request run."""
     os.makedirs(CACHE_DIR, exist_ok=True)
     path = os.path.join(CACHE_DIR, cache_name)
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return f.read()
-    r = requests.get(url, headers=HEADERS, timeout=30)
-    time.sleep(SLEEP)
-    if r.status_code != 200:
-        return None
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(r.text)
-    return r.text
+    last_err = None
+    for attempt in range(retries):
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=30)
+            time.sleep(SLEEP)
+            if r.status_code == 404:
+                return None  # vote/menu doesn't exist; don't retry
+            if r.status_code != 200:
+                last_err = f"HTTP {r.status_code}"
+                time.sleep(2 ** attempt)
+                continue
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(r.text)
+            return r.text
+        except requests.exceptions.RequestException as e:
+            last_err = e
+            time.sleep(2 ** attempt)  # 1s, 2s, 4s, 8s, 16s
+    print(f"  ! gave up on {url} after {retries} tries ({last_err})")
+    return None
 
 
 def vote_numbers(congress, session):
