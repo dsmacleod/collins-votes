@@ -47,11 +47,17 @@ It writes **`collins_votes.json`** (and a `.csv` if you'd rather eyeball it in E
 Expect a few thousand votes; the run takes a while because it politely downloads one
 file at a time and caches them, so a second run is instant.
 
-Then either:
-- **Quick way:** open `collins-votes-tool.html`, find the line `const VOTES = [`,
-  and paste the JSON contents in place of the demo array; or
-- **Cleaner way:** have the dev change that one line to load the JSON file instead,
-  so future refreshes are just a re-run of the script. (One-line change — they'll know.)
+Then **just drop `collins_votes.json` in the same folder as `collins-votes-tool.html`**
+(and commit/push it). The page now loads that file automatically on open — no code edit
+needed. If the file isn't there, the page falls back to the built-in demo votes, so it
+never breaks. Future refreshes are simply: re-run the script, replace the JSON, push.
+
+Two things the page does automatically once the real data is in:
+- **Caps the visible list to the top 200** by importance so 9,000 rows stay fast. A
+  "Show all rows" checkbox lifts the cap; the count line tells readers what's hidden.
+- **Hides procedural votes** (cloture, motions to proceed/table, etc.) by default, since
+  they're most of the record by count but rarely the real decision. A "Hide procedural
+  votes" checkbox toggles them. The scraper tags each vote with this flag.
 
 ## The one editorial decision to make
 

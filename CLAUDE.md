@@ -6,15 +6,25 @@ factors: vote closeness, how decisive she was, breaking with her party, and topi
 
 ## Files
 - `collins-votes-tool.html` — self-contained reader tool. Scoring engine + sliders are
-  inline near the bottom in `<script>`. Seeded with 12 demo votes in `const VOTES = [...]`.
+  inline near the bottom in `<script>`. On load it `fetch`es `collins_votes.json` from the
+  same folder; if absent it falls back to the 12-vote demo seed (`const SEED = [...]`).
+  Renders the top 200 matching votes by default (cap lifts via "Show all rows"); hides
+  procedural votes by default ("Hide procedural votes" checkbox). Slider input is
+  coalesced via requestAnimationFrame so big datasets stay snappy.
 - `scrape_collins_votes.py` — pulls Collins' full roll-call record (1997–present) from
-  senate.gov, scores it, writes `collins_votes.json` + `collins_votes.csv`.
+  senate.gov, scores it, writes `collins_votes.json` + `collins_votes.csv`. Tags each
+  vote `procedural` (PROCEDURAL_KEYS) — keep in sync with PROCEDURAL_RE in the HTML.
+- `index.html` — redirect to the tool, for the GitHub Pages root.
 - `HANDOFF.md` — plain-English overview (the owner, Dan, is a journalist, not a coder).
+
+## Live
+- Public repo `github.com/dsmacleod/collins-votes`; GitHub Pages at
+  https://dsmacleod.github.io/collins-votes/ (master branch, root).
 
 ## Current state / likely next steps
 1. Run the scraper (`pip install requests && python3 scrape_collins_votes.py`) to
-   generate the real dataset, then replace the demo `VOTES` array in the HTML with the
-   JSON — or wire the HTML to `fetch('collins_votes.json')` so refreshes are one re-run.
+   generate the real dataset, then drop `collins_votes.json` next to the HTML and push.
+   No HTML edit needed — the page loads it automatically.
 2. Verify the 9 unverified demo tallies if they're kept (3 are marked ✓ verified).
 3. Tune `TOPIC_RULES` salience weights in the scraper to match newsroom editorial judgment.
 4. Optional: match BDN site styling; add CSV export; build a companion story.

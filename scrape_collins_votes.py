@@ -69,6 +69,22 @@ def topic_for(text):
     return DEFAULT_TOPIC
 
 
+# Procedural question patterns. These votes (cloture, motions to proceed/table, etc.)
+# dominate the record by count but are rarely the substantive decision, so the tool
+# hides them by default. Keep this in sync with PROCEDURAL_RE in collins-votes-tool.html.
+PROCEDURAL_KEYS = (
+    "cloture", "motion to proceed", "motion to table", "motion to discharge",
+    "motion to recommit", "motion to reconsider", "motion to postpone",
+    "adjourn", "quorum", "point of order", "to waive",
+    "decision of the chair", "sustain the ruling",
+)
+
+
+def is_procedural(text):
+    t = (text or "").lower()
+    return any(k in t for k in PROCEDURAL_KEYS)
+
+
 def fetch(url, cache_name):
     """Download with on-disk caching so re-runs are instant and polite."""
     os.makedirs(CACHE_DIR, exist_ok=True)
@@ -148,12 +164,14 @@ def parse_vote(congress, session, num):
     return {
         "title": title.strip(),
         "meta": (bill + " — " if bill else "") + question.strip(),
+        "question": question.strip(),
         "topic": topic,
         "date": date,
         "yea": yeas,
         "nay": nays,
         "position": collins_vote,
         "partyBreak": party_break,
+        "procedural": is_procedural(question + " " + title),
         "salience": salience,
         "verified": True,
         "congress": congress,

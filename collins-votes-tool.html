@@ -29,6 +29,10 @@
   .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px;font-size:13px}
   .filters select,.filters input{font-family:Arial,Helvetica,sans-serif;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px}
   .filters .reset{cursor:pointer;background:var(--accent);color:#fff;border:none;padding:7px 12px;border-radius:6px;font-weight:bold}
+  .filters label.chk{display:flex;align-items:center;gap:5px}
+  .filters label.chk input{width:auto}
+  .more{font-family:Arial,Helvetica,sans-serif;font-size:13px;text-align:center;padding:14px;color:var(--muted)}
+  .more button{cursor:pointer;background:none;border:1px solid var(--accent);color:var(--accent);padding:7px 14px;border-radius:6px;font-weight:bold;font-size:13px}
   table{width:100%;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:14px}
   thead th{text-align:left;border-bottom:2px solid var(--ink);padding:10px 8px;font-size:12px;
     text-transform:uppercase;letter-spacing:.4px;cursor:pointer;user-select:none;white-space:nowrap}
@@ -59,7 +63,7 @@
     <p class="sub">An interactive look at how Maine's senior senator votes — and which votes mattered most. <strong>You decide what "important" means.</strong></p>
   </header>
 
-  <div class="demo-flag">
+  <div class="demo-flag" id="data-flag">
     <strong>Prototype / demo data.</strong> This page is seeded with a curated sample of landmark votes to show how the tool works.
     The production version is populated automatically from the U.S. Senate's official roll-call record (see the scraper + handoff doc). Tallies marked
     &#10003; were pulled live from senate.gov; the rest are illustrative and should be verified before publication.
@@ -100,6 +104,8 @@
       <label>Search:
         <input type="text" id="f-search" placeholder="bill, keyword&hellip;">
       </label>
+      <label class="chk"><input type="checkbox" id="f-proc" checked> Hide procedural votes</label>
+      <label class="chk"><input type="checkbox" id="f-all"> Show all rows</label>
       <button class="reset" id="reset">Reset weights</button>
     </div>
   </div>
@@ -129,7 +135,7 @@
    verified:true = tally pulled live from senate.gov during build.
    partyBreak:true = Collins voted opposite most Senate Republicans.
    salience 0-100 = assigned topic weight (the one human-judgment factor). */
-const VOTES = [
+const SEED = [
   {title:"'Skinny repeal' of the Affordable Care Act", meta:"McConnell Amdt. 667 to H.R. 1628", topic:"Health care", date:"2017-07-28", yea:49, nay:51, position:"Nay", partyBreak:true, salience:100, verified:true},
   {title:"Confirmation of Brett Kavanaugh to the Supreme Court", meta:"PN2259", topic:"Supreme Court", date:"2018-10-06", yea:50, nay:48, position:"Yea", partyBreak:false, salience:100, verified:true},
   {title:"Confirmation of Amy Coney Barrett to the Supreme Court", meta:"PN2378", topic:"Supreme Court", date:"2020-10-26", yea:52, nay:48, position:"Nay", partyBreak:true, salience:100, verified:false},
@@ -143,6 +149,21 @@ const VOTES = [
   {title:"Confirmation of Neil Gorsuch to the Supreme Court", meta:"PN55", topic:"Supreme Court", date:"2017-04-07", yea:54, nay:45, position:"Yea", partyBreak:false, salience:95, verified:false},
   {title:"Cloture on the Laken Riley Act", meta:"S. 5, motion to proceed", topic:"Immigration", date:"2025-01-09", yea:84, nay:9, position:"Yea", partyBreak:false, salience:70, verified:true}
 ];
+
+/* VOTES is the live dataset. It starts as the demo seed and is replaced by the
+   scraper's collins_votes.json if that file is present alongside this page. */
+let VOTES = SEED;
+let usingLiveData = false;
+const MAX_ROWS = 200;          // cap rendered rows so 9,000-vote datasets stay snappy
+let showAll = false;
+
+/* Procedural detection: cloture, motions to proceed/table, etc. The scraper now
+   tags each vote with `procedural`; this is the fallback for any record missing it
+   (including the demo seed). Keep this list in sync with the scraper. */
+const PROCEDURAL_RE = /\b(cloture|motion to proceed|motion to table|motion to discharge|motion to recommit|motion to reconsider|motion to postpone|adjourn|quorum|point of order|to waive|decision of the chair|sustain the ruling)\b/i;
+function isProcedural(v){
+  return PROCEDURAL_RE.test([v.title, v.meta, v.question].filter(Boolean).join(' '));
+}
 
 /* ---- SCORING ENGINE (transparent + reproducible) ---- */
 function factors(v){
@@ -172,14 +193,11 @@ const els = {
   brk:document.getElementById('w-break'), sal:document.getElementById('w-sal'),
   rows:document.getElementById('rows'), count:document.getElementById('count'),
   fTopic:document.getElementById('f-topic'), fVote:document.getElementById('f-vote'),
-  fSearch:document.getElementById('f-search')
+  fSearch:document.getElementById('f-search'), fProc:document.getElementById('f-proc'),
+  fAll:document.getElementById('f-all'), flag:document.getElementById('data-flag')
 };
 let sortKey='score', sortDir=-1;
-
-// populate topic filter
-[...new Set(VOTES.map(v=>v.topic))].sort().forEach(t=>{
-  const o=document.createElement('option'); o.value=t; o.textContent=t; els.fTopic.appendChild(o);
-});
+const nf = new Intl.NumberFormat('en-US');
 
 function weights(){ return {close:+els.close.value, dec:+els.dec.value, brk:0, break:+els.brk.value, sal:+els.sal.value}; }
 
@@ -193,7 +211,9 @@ function render(){
   let data = VOTES.map(v=>({...v, _score:score(v,w), _f:factors(v)}));
   // filters
   const ft=els.fTopic.value, fv=els.fVote.value, fs=els.fSearch.value.toLowerCase();
+  const hideProc=els.fProc.checked;
   data = data.filter(v=>(!ft||v.topic===ft) && (!fv||v.position===fv) &&
+    (!hideProc || !v.procedural) &&
     (!fs || (v.title+' '+v.meta+' '+v.topic).toLowerCase().includes(fs)));
   // sort
   data.sort((a,b)=>{
@@ -206,7 +226,12 @@ function render(){
     return x<y?-sortDir:x>y?sortDir:0;
   });
 
-  els.count.textContent = data.length + ' of ' + VOTES.length + ' votes shown';
+  const matched = data.length;
+  const capped = !showAll && matched > MAX_ROWS;
+  if(capped) data = data.slice(0, MAX_ROWS);
+  els.count.textContent = capped
+    ? `Showing top ${nf.format(MAX_ROWS)} of ${nf.format(matched)} matching votes (${nf.format(VOTES.length)} total)`
+    : `${nf.format(matched)} of ${nf.format(VOTES.length)} votes shown`;
   els.rows.innerHTML = data.map((v,i)=>{
     const d=new Date(v.date+'T00:00');
     const ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
@@ -226,9 +251,18 @@ function render(){
   }).join('');
 }
 
-[els.close,els.dec,els.brk,els.sal,els.fTopic,els.fVote,els.fSearch].forEach(e=>{
-  e.addEventListener('input',render);
+// coalesce rapid slider/keyboard input into one render per frame
+let queued=false;
+function scheduleRender(){
+  if(queued) return;
+  queued=true;
+  requestAnimationFrame(()=>{ queued=false; render(); });
+}
+
+[els.close,els.dec,els.brk,els.sal,els.fTopic,els.fVote,els.fSearch,els.fProc].forEach(e=>{
+  e.addEventListener('input',scheduleRender);
 });
+els.fAll.addEventListener('input',()=>{ showAll=els.fAll.checked; scheduleRender(); });
 document.querySelectorAll('th[data-sort]').forEach(th=>{
   th.addEventListener('click',()=>{
     const k=th.getAttribute('data-sort');
@@ -239,9 +273,42 @@ document.querySelectorAll('th[data-sort]').forEach(th=>{
 document.getElementById('reset').addEventListener('click',()=>{
   els.close.value=25; els.dec.value=25; els.brk.value=25; els.sal.value=25;
   els.fTopic.value=''; els.fVote.value=''; els.fSearch.value='';
+  els.fProc.checked=true; els.fAll.checked=false; showAll=false;
   sortKey='score'; sortDir=-1; render();
 });
-render();
+
+/* ---- DATA LOADING ---- */
+function normalize(list){
+  return list.map(v=>({...v, procedural: v.procedural!==undefined ? v.procedural : isProcedural(v)}));
+}
+function populateTopics(){
+  els.fTopic.innerHTML='<option value="">All</option>';
+  [...new Set(VOTES.map(v=>v.topic))].sort().forEach(t=>{
+    const o=document.createElement('option'); o.value=t; o.textContent=t; els.fTopic.appendChild(o);
+  });
+}
+function init(){
+  VOTES = normalize(VOTES);
+  if(usingLiveData){
+    const procCount = VOTES.filter(v=>v.procedural).length;
+    els.flag.innerHTML = `<strong>Live data.</strong> ${nf.format(VOTES.length)} roll-call votes loaded `
+      + `from the U.S. Senate's official record (senate.gov). `
+      + `${nf.format(procCount)} are procedural (cloture, motions to proceed, etc.) and hidden by default &mdash; uncheck the box to include them.`;
+  }
+  populateTopics();
+  render();
+}
+async function loadData(){
+  try{
+    const res = await fetch('collins_votes.json', {cache:'no-store'});
+    if(res.ok){
+      const json = await res.json();
+      if(Array.isArray(json) && json.length){ VOTES = json; usingLiveData = true; }
+    }
+  }catch(e){ /* no JSON yet — fall back to the demo seed */ }
+  init();
+}
+loadData();
 </script>
 </body>
 </html>
