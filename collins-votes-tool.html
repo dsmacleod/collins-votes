@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Susan Collins Vote Tracker — Rank by Importance</title>
+<style>
+  :root{
+    --ink:#1a1a1a; --muted:#666; --line:#e2e2e2; --bg:#fff;
+    --accent:#0a4d8c; --accent-soft:#eaf1f8; --yea:#1e7a3d; --nay:#b3261e;
+    --bar:#0a4d8c; --bar-bg:#eee;
+  }
+  *{box-sizing:border-box}
+  body{font-family:Georgia,'Times New Roman',serif;color:var(--ink);background:var(--bg);margin:0;line-height:1.5}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 20px 80px}
+  header h1{font-size:30px;margin:0 0 6px;letter-spacing:-.3px}
+  header p.sub{margin:0 0 4px;color:var(--muted);font-size:15px}
+  .demo-flag{background:#fff7e6;border:1px solid #f0d68a;color:#7a5b00;font-family:Arial,Helvetica,sans-serif;
+    font-size:12.5px;padding:8px 12px;border-radius:6px;margin:14px 0 22px}
+  .controls{font-family:Arial,Helvetica,sans-serif;border:1px solid var(--line);border-radius:10px;
+    padding:18px 20px;background:#fafafa;margin-bottom:22px}
+  .controls h2{font-size:14px;text-transform:uppercase;letter-spacing:.6px;margin:0 0 4px;color:var(--accent)}
+  .controls .hint{font-size:13px;color:var(--muted);margin:0 0 16px}
+  .sliders{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
+  .slider label{display:block;font-size:13px;font-weight:bold;margin-bottom:2px}
+  .slider .desc{font-size:11.5px;color:var(--muted);margin-bottom:6px;min-height:28px}
+  .slider input[type=range]{width:100%}
+  .slider .val{font-size:12px;color:var(--accent);font-weight:bold;float:right}
+  .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px;font-size:13px}
+  .filters select,.filters input{font-family:Arial,Helvetica,sans-serif;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px}
+  .filters .reset{cursor:pointer;background:var(--accent);color:#fff;border:none;padding:7px 12px;border-radius:6px;font-weight:bold}
+  table{width:100%;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:14px}
+  thead th{text-align:left;border-bottom:2px solid var(--ink);padding:10px 8px;font-size:12px;
+    text-transform:uppercase;letter-spacing:.4px;cursor:pointer;user-select:none;white-space:nowrap}
+  thead th.num{text-align:center}
+  tbody td{border-bottom:1px solid var(--line);padding:11px 8px;vertical-align:top}
+  td.num{text-align:center;white-space:nowrap}
+  .title-cell{font-family:Georgia,serif;font-size:15px;max-width:380px}
+  .title-cell .meta{display:block;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:var(--muted);margin-top:3px}
+  .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:20px;background:var(--accent-soft);color:var(--accent);margin-top:5px}
+  .pos{font-weight:bold}
+  .pos.Yea{color:var(--yea)} .pos.Nay{color:var(--nay)}
+  .score{font-weight:bold;font-size:15px}
+  .scorebar{height:6px;border-radius:3px;background:var(--bar-bg);margin-top:4px;overflow:hidden;min-width:60px}
+  .scorebar > div{height:100%;background:var(--bar)}
+  .badge{display:inline-block;font-size:10.5px;font-weight:bold;padding:1px 6px;border-radius:4px;margin-left:5px;vertical-align:middle}
+  .badge.break{background:#fdeceb;color:var(--nay)}
+  .badge.decisive{background:#eafaf0;color:var(--yea)}
+  .rank{color:var(--muted);font-size:13px}
+  footer{margin-top:30px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
+  .count{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:var(--muted);margin-bottom:8px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Susan Collins: Every Vote, Ranked by Importance</h1>
+    <p class="sub">An interactive look at how Maine's senior senator votes — and which votes mattered most. <strong>You decide what "important" means.</strong></p>
+  </header>
+
+  <div class="demo-flag">
+    <strong>Prototype / demo data.</strong> This page is seeded with a curated sample of landmark votes to show how the tool works.
+    The production version is populated automatically from the U.S. Senate's official roll-call record (see the scraper + handoff doc). Tallies marked
+    &#10003; were pulled live from senate.gov; the rest are illustrative and should be verified before publication.
+  </div>
+
+  <div class="controls">
+    <h2>Adjust what makes a vote "important"</h2>
+    <p class="hint">Move the sliders to weight each factor. The ranking re-sorts instantly. Set a factor to zero to ignore it.</p>
+    <div class="sliders">
+      <div class="slider">
+        <label>How close the vote was <span class="val" id="v-close">25</span></label>
+        <div class="desc">Tight votes (51&ndash;49) outrank lopsided ones (90&ndash;5).</div>
+        <input type="range" id="w-close" min="0" max="100" value="25">
+      </div>
+      <div class="slider">
+        <label>How decisive she was <span class="val" id="v-dec">25</span></label>
+        <div class="desc">How few senators would have had to flip to change the outcome.</div>
+        <input type="range" id="w-dec" min="0" max="100" value="25">
+      </div>
+      <div class="slider">
+        <label>Breaking with her party <span class="val" id="v-break">25</span></label>
+        <div class="desc">Did she vote against most Senate Republicans?</div>
+        <input type="range" id="w-break" min="0" max="100" value="25">
+      </div>
+      <div class="slider">
+        <label>Topic salience <span class="val" id="v-sal">25</span></label>
+        <div class="desc">Weight high-stakes issues (courts, health care, impeachment) higher.</div>
+        <input type="range" id="w-sal" min="0" max="100" value="25">
+      </div>
+    </div>
+    <div class="filters">
+      <label>Topic:
+        <select id="f-topic"><option value="">All</option></select>
+      </label>
+      <label>Her vote:
+        <select id="f-vote"><option value="">All</option><option>Yea</option><option>Nay</option></select>
+      </label>
+      <label>Search:
+        <input type="text" id="f-search" placeholder="bill, keyword&hellip;">
+      </label>
+      <button class="reset" id="reset">Reset weights</button>
+    </div>
+  </div>
+
+  <div class="count" id="count"></div>
+  <table>
+    <thead>
+      <tr>
+        <th class="num">#</th>
+        <th data-sort="title">Vote</th>
+        <th class="num" data-sort="date">Date</th>
+        <th class="num" data-sort="position">Her vote</th>
+        <th class="num" data-sort="tally">Tally</th>
+        <th class="num" data-sort="score">Importance &#9660;</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <footer>
+    <p>Source: U.S. Senate roll-call votes (senate.gov). "Importance" is an editorial score built from four transparent factors that you control above &mdash; it is not an official measure. Closeness and decisiveness are computed from the vote tally; party-break compares her vote to the Republican majority; topic salience is an assigned weight by subject.</p>
+  </footer>
+</div>
+
+<script>
+/* ---- SEED DATA (demo). Production version is generated by the scraper. ----
+   verified:true = tally pulled live from senate.gov during build.
+   partyBreak:true = Collins voted opposite most Senate Republicans.
+   salience 0-100 = assigned topic weight (the one human-judgment factor). */
+const VOTES = [
+  {title:"'Skinny repeal' of the Affordable Care Act", meta:"McConnell Amdt. 667 to H.R. 1628", topic:"Health care", date:"2017-07-28", yea:49, nay:51, position:"Nay", partyBreak:true, salience:100, verified:true},
+  {title:"Confirmation of Brett Kavanaugh to the Supreme Court", meta:"PN2259", topic:"Supreme Court", date:"2018-10-06", yea:50, nay:48, position:"Yea", partyBreak:false, salience:100, verified:true},
+  {title:"Confirmation of Amy Coney Barrett to the Supreme Court", meta:"PN2378", topic:"Supreme Court", date:"2020-10-26", yea:52, nay:48, position:"Nay", partyBreak:true, salience:100, verified:false},
+  {title:"Inflation Reduction Act — passage", meta:"H.R. 5376", topic:"Climate / Health care", date:"2022-08-07", yea:51, nay:50, position:"Nay", partyBreak:false, salience:85, verified:false},
+  {title:"Tax Cuts and Jobs Act — Senate passage", meta:"H.R. 1", topic:"Taxes", date:"2017-12-02", yea:51, nay:49, position:"Yea", partyBreak:false, salience:90, verified:false},
+  {title:"Trump impeachment I — Article I (abuse of power)", meta:"Senate trial, 116th Cong.", topic:"Impeachment", date:"2020-02-05", yea:48, nay:52, position:"Nay", partyBreak:false, salience:100, verified:false},
+  {title:"Trump impeachment II — conviction (incitement)", meta:"Senate trial, 117th Cong.", topic:"Impeachment", date:"2021-02-13", yea:57, nay:43, position:"Yea", partyBreak:true, salience:100, verified:false},
+  {title:"Confirmation of Ketanji Brown Jackson to the Supreme Court", meta:"PN1783", topic:"Supreme Court", date:"2022-04-07", yea:53, nay:47, position:"Yea", partyBreak:true, salience:100, verified:false},
+  {title:"Respect for Marriage Act — passage", meta:"H.R. 8404", topic:"Civil rights", date:"2022-11-29", yea:61, nay:36, position:"Yea", partyBreak:true, salience:90, verified:false},
+  {title:"Infrastructure Investment and Jobs Act — passage", meta:"H.R. 3684", topic:"Infrastructure", date:"2021-08-10", yea:69, nay:30, position:"Yea", partyBreak:true, salience:75, verified:false},
+  {title:"Confirmation of Neil Gorsuch to the Supreme Court", meta:"PN55", topic:"Supreme Court", date:"2017-04-07", yea:54, nay:45, position:"Yea", partyBreak:false, salience:95, verified:false},
+  {title:"Cloture on the Laken Riley Act", meta:"S. 5, motion to proceed", topic:"Immigration", date:"2025-01-09", yea:84, nay:9, position:"Yea", partyBreak:false, salience:70, verified:true}
+];
+
+/* ---- SCORING ENGINE (transparent + reproducible) ---- */
+function factors(v){
+  const total = v.yea + v.nay;
+  const margin = Math.abs(v.yea - v.nay);
+  // closeness: 100 when tied, falls as the margin widens
+  const closeness = Math.max(0, Math.round(100 * (1 - margin/total)));
+  // decisive: how few senators would need to flip to change the result
+  const flips = Math.floor(margin/2) + 1;
+  const decisive = Math.round(100 / flips);
+  // party break: binary signal
+  const partyBreak = v.partyBreak ? 100 : 0;
+  // salience: assigned
+  const salience = v.salience;
+  return {closeness, decisive, partyBreak, salience};
+}
+function score(v, w){
+  const f = factors(v);
+  const denom = w.close + w.dec + w.break + w.sal;
+  if(denom === 0) return 0;
+  return Math.round((w.close*f.closeness + w.dec*f.decisive + w.break*f.partyBreak + w.sal*f.salience)/denom);
+}
+
+/* ---- UI ---- */
+const els = {
+  close:document.getElementById('w-close'), dec:document.getElementById('w-dec'),
+  brk:document.getElementById('w-break'), sal:document.getElementById('w-sal'),
+  rows:document.getElementById('rows'), count:document.getElementById('count'),
+  fTopic:document.getElementById('f-topic'), fVote:document.getElementById('f-vote'),
+  fSearch:document.getElementById('f-search')
+};
+let sortKey='score', sortDir=-1;
+
+// populate topic filter
+[...new Set(VOTES.map(v=>v.topic))].sort().forEach(t=>{
+  const o=document.createElement('option'); o.value=t; o.textContent=t; els.fTopic.appendChild(o);
+});
+
+function weights(){ return {close:+els.close.value, dec:+els.dec.value, brk:0, break:+els.brk.value, sal:+els.sal.value}; }
+
+function render(){
+  const w = weights();
+  document.getElementById('v-close').textContent=els.close.value;
+  document.getElementById('v-dec').textContent=els.dec.value;
+  document.getElementById('v-break').textContent=els.brk.value;
+  document.getElementById('v-sal').textContent=els.sal.value;
+
+  let data = VOTES.map(v=>({...v, _score:score(v,w), _f:factors(v)}));
+  // filters
+  const ft=els.fTopic.value, fv=els.fVote.value, fs=els.fSearch.value.toLowerCase();
+  data = data.filter(v=>(!ft||v.topic===ft) && (!fv||v.position===fv) &&
+    (!fs || (v.title+' '+v.meta+' '+v.topic).toLowerCase().includes(fs)));
+  // sort
+  data.sort((a,b)=>{
+    let x,y;
+    if(sortKey==='score'){x=a._score;y=b._score;}
+    else if(sortKey==='date'){x=a.date;y=b.date;}
+    else if(sortKey==='position'){x=a.position;y=b.position;}
+    else if(sortKey==='tally'){x=a.yea-a.nay;y=b.yea-b.nay;}
+    else {x=a.title;y=b.title;}
+    return x<y?-sortDir:x>y?sortDir:0;
+  });
+
+  els.count.textContent = data.length + ' of ' + VOTES.length + ' votes shown';
+  els.rows.innerHTML = data.map((v,i)=>{
+    const d=new Date(v.date+'T00:00');
+    const ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const badges = (v.partyBreak?'<span class="badge break">broke w/ GOP</span>':'') +
+                   (v._f.decisive>=50?'<span class="badge decisive">pivotal</span>':'');
+    return `<tr>
+      <td class="num rank">${i+1}</td>
+      <td class="title-cell">${v.title}${badges}
+        <span class="meta">${v.meta}${v.verified?' &nbsp;&#10003; verified':''}</span>
+        <span class="tag">${v.topic}</span></td>
+      <td class="num">${ds}</td>
+      <td class="num"><span class="pos ${v.position}">${v.position}</span></td>
+      <td class="num">${v.yea}&ndash;${v.nay}</td>
+      <td class="num"><span class="score">${v._score}</span>
+        <div class="scorebar"><div style="width:${v._score}%"></div></div></td>
+    </tr>`;
+  }).join('');
+}
+
+[els.close,els.dec,els.brk,els.sal,els.fTopic,els.fVote,els.fSearch].forEach(e=>{
+  e.addEventListener('input',render);
+});
+document.querySelectorAll('th[data-sort]').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const k=th.getAttribute('data-sort');
+    if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir = (k==='score'||k==='date')?-1:1;}
+    render();
+  });
+});
+document.getElementById('reset').addEventListener('click',()=>{
+  els.close.value=25; els.dec.value=25; els.brk.value=25; els.sal.value=25;
+  els.fTopic.value=''; els.fVote.value=''; els.fSearch.value='';
+  sortKey='score'; sortDir=-1; render();
+});
+render();
+</script>
+</body>
+</html>
